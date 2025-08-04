@@ -1,0 +1,56 @@
+from datetime import datetime
+from typing import Optional
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Index, UniqueConstraint
+from sqlalchemy.orm import declarative_base
+from sqlalchemy.sql import func
+
+Base = declarative_base()
+
+
+class Article(Base):
+    __tablename__ = "articles"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    url = Column(String(500), unique=True, nullable=False, index=True)
+    title = Column(String(500), nullable=False)
+    title_ru = Column(String(500), nullable=True)
+    title_original = Column(String(500), nullable=True)
+    description = Column(Text, nullable=True)
+    description_ru = Column(Text, nullable=True)
+    description_original = Column(Text, nullable=True)
+    published_at = Column(DateTime, nullable=True)
+    parsed_at = Column(DateTime, server_default=func.now(), nullable=False)
+    sent_at = Column(DateTime, nullable=True)
+    is_sent = Column(Boolean, default=False, nullable=False, index=True)
+    source = Column(String(50), nullable=True, index=True)
+    
+    __table_args__ = (
+        Index("idx_is_sent_published", "is_sent", "published_at"),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<Article(id={self.id}, title={self.title[:50]}...)>"
+
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    telegram_id = Column(Integer, unique=True, nullable=False, index=True)
+    username = Column(String(255), nullable=True)
+    first_name = Column(String(255), nullable=True)
+    last_name = Column(String(255), nullable=True)
+    language_code = Column(String(10), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    last_seen_at = Column(DateTime, server_default=func.now(), nullable=False)
+    
+    __table_args__ = (
+        Index("idx_active_created", "is_active", "created_at"),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<User(id={self.id}, telegram_id={self.telegram_id}, username={self.username})>"
+
+

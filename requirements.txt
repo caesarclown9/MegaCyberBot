@@ -1,0 +1,35 @@
+# Core dependencies
+aiohttp==3.9.5          # Async HTTP client for fast requests
+aiogram==3.7.0          # Modern async Telegram Bot framework
+beautifulsoup4==4.12.3  # HTML parsing
+lxml==5.2.2             # Fast XML/HTML parser
+feedparser==6.0.11      # RSS feed parsing
+
+# Database
+sqlalchemy==2.0.30      # ORM for database operations
+aiosqlite==0.20.0       # Async SQLite driver
+alembic==1.13.1         # Database migrations
+
+# Translation
+deep-translator==1.11.4 # Multiple translation APIs support
+
+# Scheduling and utilities
+apscheduler==3.10.4     # Task scheduling
+pydantic==2.7.1         # Data validation
+pydantic-settings==2.3.0 # Settings management
+python-dotenv==1.0.1    # Environment variables
+aiofiles==23.2.1        # Async file operations
+
+# Monitoring and logging
+structlog==24.2.0       # Structured logging
+prometheus-client==0.20.0 # Metrics
+sentry-sdk==2.5.1       # Error tracking
+
+# Development
+pytest==8.2.1           # Testing
+pytest-asyncio==0.23.7  # Async tests
+pytest-cov==5.0.0       # Code coverage
+black==24.4.2           # Code formatting
+flake8==7.0.0           # Linting
+mypy==1.10.0            # Type checking
+pre-commit==3.7.1       # Git hooks

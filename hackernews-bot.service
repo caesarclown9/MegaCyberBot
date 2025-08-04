@@ -1,0 +1,32 @@
+[Unit]
+Description=HackerNews Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=botuser
+Group=botuser
+WorkingDirectory=/opt/hackernews-bot
+Environment="PATH=/opt/hackernews-bot/venv/bin"
+ExecStart=/opt/hackernews-bot/venv/bin/python /opt/hackernews-bot/main.py
+Restart=always
+RestartSec=10
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/hackernews-bot/data /opt/hackernews-bot/logs
+
+# Resource limits
+LimitNOFILE=1024
+MemoryLimit=512M
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hackernews-bot
+
+[Install]
+WantedBy=multi-user.target
