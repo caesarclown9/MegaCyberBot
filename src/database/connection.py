@@ -30,6 +30,10 @@ class DatabaseManager(LoggerMixin):
             if self.database_url.startswith("sqlite"):
                 engine_kwargs["poolclass"] = NullPool
                 engine_kwargs["connect_args"] = {"check_same_thread": False}
+            # PostgreSQL settings for production
+            elif self.database_url.startswith("postgresql"):
+                engine_kwargs["pool_pre_ping"] = True
+                engine_kwargs["pool_recycle"] = 300
             
             self._engine = create_async_engine(self.database_url, **engine_kwargs)
             

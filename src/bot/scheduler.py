@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime
 from typing import Optional
+import aiohttp
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from src.config import settings
@@ -49,6 +50,16 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
             name="Cleanup old data",
             replace_existing=True
         )
+        
+        # Schedule keep-alive to prevent Render from sleeping
+        if settings.environment == "production":
+            self.scheduler.add_job(
+                func=self.keep_alive,
+                trigger=IntervalTrigger(minutes=10),
+                id="keep_alive",
+                name="Keep alive ping",
+                replace_existing=True
+            )
         
         # Start scheduler
         self.scheduler.start()
@@ -196,3 +207,16 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                 
         except Exception as e:
             self.log_error("Cleanup failed", error=str(e))
+    
+    async def keep_alive(self):
+        """Send keep-alive ping to prevent Render from sleeping."""
+        try:
+            # Ping our own metrics endpoint
+            async with aiohttp.ClientSession() as session:
+                async with session.get("http://localhost:8000/metrics", timeout=5) as response:
+                    if response.status == 200:
+                        self.log_info("Keep-alive ping successful")
+                    else:
+                        self.log_warning(f"Keep-alive ping failed: {response.status}")
+        except Exception as e:
+            self.log_warning("Keep-alive ping failed", error=str(e))
