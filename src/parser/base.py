@@ -34,8 +34,13 @@ class BaseParser(ABC, LoggerMixin, MetricsMixin):
             if settings.proxy_url:
                 connector_kwargs['trust_env'] = True
             
-            # Create connector
-            connector = aiohttp.TCPConnector(**connector_kwargs) if connector_kwargs else None
+            # Create connector with SSL settings
+            connector = aiohttp.TCPConnector(
+                ssl=False,  # Disable SSL verification temporarily
+                limit=100,
+                limit_per_host=30,
+                **connector_kwargs
+            ) if True else None
             
             # Session kwargs
             session_kwargs = {

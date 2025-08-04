@@ -70,12 +70,18 @@ class TelegramBot(LoggerMixin, MetricsMixin):
             
             try:
                 # Send to group
-                await self.bot.send_message(
-                    chat_id=settings.telegram_group_id,
-                    text=text,
-                    parse_mode=ParseMode.MARKDOWN,
-                    disable_web_page_preview=True
-                )
+                message_params = {
+                    "chat_id": settings.telegram_group_id,
+                    "text": text,
+                    "parse_mode": ParseMode.MARKDOWN,
+                    "disable_web_page_preview": True
+                }
+                
+                # Add topic_id if configured for forum supergroups
+                if settings.telegram_topic_id:
+                    message_params["message_thread_id"] = settings.telegram_topic_id
+                
+                await self.bot.send_message(**message_params)
                 
                 # Mark article as sent
                 await article_repo.mark_as_sent(article.id)
