@@ -67,7 +67,7 @@ class BaseParser(ABC, LoggerMixin, MetricsMixin):
                 response.raise_for_status()
                 return await response.text()
         except aiohttp.ClientResponseError as e:
-            self.log_error("HTTP error", url=url, status=e.status, message=e.message)
+            self.log_error("HTTP error", url=url, status=e.status, error_message=e.message)
             raise
         except aiohttp.ClientError as e:
             self.log_error("Failed to fetch page", url=url, error=str(e), error_type=type(e).__name__)

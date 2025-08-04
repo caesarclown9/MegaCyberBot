@@ -72,6 +72,13 @@ class RSSFeedParser(BaseParser):
                 article_date = article.get("published_at")
                 if article_date and article_date >= settings.min_article_datetime:
                     filtered_articles.append(article)
+                elif article_date:
+                    self.log_debug(
+                        "Article filtered out by date",
+                        title=article.get("title", "")[:50],
+                        article_date=article_date.isoformat(),
+                        min_date=settings.min_article_datetime.isoformat()
+                    )
             
             # Sort by date, newest first
             filtered_articles.sort(key=lambda x: x.get("published_at", datetime.utcnow()), reverse=True)
