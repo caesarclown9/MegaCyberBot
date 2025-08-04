@@ -63,7 +63,13 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
-        if not v.startswith(("sqlite", "postgresql", "mysql")):
+        # Support both sync and async PostgreSQL drivers
+        if v.startswith("postgresql://"):
+            # Convert to async driver for SQLAlchemy async
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        
+        # Validate supported database types
+        if not v.startswith(("sqlite", "postgresql+asyncpg", "postgresql+psycopg", "mysql")):
             raise ValueError("Unsupported database type")
         return v
     
