@@ -9,7 +9,6 @@ feedparser==6.0.11      # RSS feed parsing
 sqlalchemy==2.0.30      # ORM for database operations
 aiosqlite==0.20.0       # Async SQLite driver (for local development)
 asyncpg==0.29.0         # Async PostgreSQL driver (for production)
-psycopg2-binary==2.9.9  # PostgreSQL adapter (required by SQLAlchemy)
 alembic==1.13.1         # Database migrations
 
 # Translation
