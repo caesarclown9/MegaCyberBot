@@ -15,7 +15,7 @@ class BaseParser(ABC, LoggerMixin, MetricsMixin):
         self._own_session = session is None
         self.timeout = aiohttp.ClientTimeout(total=settings.request_timeout_seconds)
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "User-Agent": settings.user_agent,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
             "Accept-Encoding": "gzip, deflate, br",
@@ -61,11 +61,16 @@ class BaseParser(ABC, LoggerMixin, MetricsMixin):
     async def fetch_page(self, url: str) -> str:
         """Fetch HTML content from URL."""
         try:
+            self.log_debug("Fetching page", url=url, headers=dict(self.session.headers))
             async with self.session.get(url) as response:
+                self.log_debug("Response received", url=url, status=response.status)
                 response.raise_for_status()
                 return await response.text()
+        except aiohttp.ClientResponseError as e:
+            self.log_error("HTTP error", url=url, status=e.status, message=e.message)
+            raise
         except aiohttp.ClientError as e:
-            self.log_error("Failed to fetch page", url=url, error=str(e))
+            self.log_error("Failed to fetch page", url=url, error=str(e), error_type=type(e).__name__)
             raise
     
     def parse_html(self, html: str) -> BeautifulSoup:
