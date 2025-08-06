@@ -15,6 +15,21 @@ class RSSFeedParser(BaseParser):
     # RSS feeds that are often accessible even when main sites are blocked
     RSS_FEEDS = [
         {
+            "name": "The Hacker News",
+            "url": "https://feeds.feedburner.com/TheHackersNews",
+            "source": "TheHackerNews"
+        },
+        {
+            "name": "BleepingComputer", 
+            "url": "https://www.bleepingcomputer.com/feed/",
+            "source": "BleepingComputer"
+        },
+        {
+            "name": "SecurityWeek",
+            "url": "https://feeds.feedburner.com/securityweek",
+            "source": "SecurityWeek"
+        },
+        {
             "name": "Krebs on Security",
             "url": "https://krebsonsecurity.com/feed/",
             "source": "KrebsOnSecurity"
@@ -56,8 +71,8 @@ class RSSFeedParser(BaseParser):
                     self.log_info(f"Found {len(articles)} articles from {feed_info['name']}")
                     all_articles.extend(articles)
                     
-                    # If we got articles from first source, that's enough
-                    if len(all_articles) >= 5:
+                    # Continue checking other sources to get more variety
+                    if len(all_articles) >= 20:  # Increased limit to get more articles
                         break
                         
             except Exception as e:
