@@ -50,7 +50,7 @@ class APIServer:
         metrics_data = generate_latest()
         return web.Response(
             body=metrics_data,
-            content_type=CONTENT_TYPE_LATEST
+            content_type="text/plain"
         )
     
     async def handle_parse(self, request):
