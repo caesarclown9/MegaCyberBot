@@ -33,7 +33,7 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
         await db_manager.init()
         
         # Schedule periodic parsing
-        job = self.scheduler.add_job(
+        self.scheduler.add_job(
             func=self.parse_and_send_news,
             trigger=IntervalTrigger(minutes=settings.parse_interval_minutes),
             id="parse_news",
@@ -45,9 +45,8 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
         
         self.log_info(
             "Scheduled parsing job",
-            job_id=job.id,
-            interval_minutes=settings.parse_interval_minutes,
-            next_run=str(job.next_run_time)
+            job_id="parse_news",
+            interval_minutes=settings.parse_interval_minutes
         )
         
         # Schedule cleanup tasks
@@ -196,11 +195,13 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                 jobs = self.scheduler.get_jobs()
                 for job in jobs:
                     if job.id == "parse_news":
+                        next_run = None
+                        if hasattr(job, 'next_run_time'):
+                            next_run = str(job.next_run_time)
                         self.log_info(
                             "Next parsing scheduled",
                             job_id=job.id,
-                            next_run=str(job.next_run_time),
-                            pending=job.pending
+                            next_run=next_run
                         )
                 
                 # Send new articles to group
@@ -248,11 +249,18 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
         try:
             # Log scheduler state
             jobs = self.scheduler.get_jobs() if self.scheduler else []
+            jobs_info = []
+            for j in jobs:
+                job_info = {"id": j.id}
+                if hasattr(j, 'next_run_time'):
+                    job_info["next_run"] = str(j.next_run_time)
+                jobs_info.append(job_info)
+            
             self.log_info(
                 "Keep-alive: Scheduler state",
                 running=self.scheduler.running if self.scheduler else False,
                 jobs_count=len(jobs),
-                jobs_info=[{"id": j.id, "next_run": str(j.next_run_time), "pending": j.pending} for j in jobs]
+                jobs_info=jobs_info
             )
             
             # Ping our own metrics endpoint

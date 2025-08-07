@@ -65,11 +65,18 @@ class Application:
             # Log scheduler status
             if self.scheduler and self.scheduler.scheduler:
                 jobs = self.scheduler.scheduler.get_jobs()
+                jobs_info = []
+                for job in jobs:
+                    job_info = {"id": job.id}
+                    if hasattr(job, 'next_run_time'):
+                        job_info["next_run"] = str(job.next_run_time)
+                    jobs_info.append(job_info)
+                
                 logger.info(
                     "Scheduler status check",
                     running=self.scheduler.scheduler.running,
                     jobs_count=len(jobs),
-                    jobs=[{"id": job.id, "next_run": str(job.next_run_time)} for job in jobs]
+                    jobs=jobs_info
                 )
             
             # Ensure scheduler is still running
