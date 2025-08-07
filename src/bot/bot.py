@@ -42,7 +42,7 @@ class TelegramBot(LoggerMixin, MetricsMixin):
             # Delete webhook to use polling
             await self.bot.delete_webhook(drop_pending_updates=True)
             
-            # Start polling
+            # Start polling (this will block, so it should be called in a task)
             await self.dp.start_polling(self.bot)
             
         except Exception as e:

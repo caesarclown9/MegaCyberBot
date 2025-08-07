@@ -33,13 +33,21 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
         await db_manager.init()
         
         # Schedule periodic parsing
-        self.scheduler.add_job(
+        job = self.scheduler.add_job(
             func=self.parse_and_send_news,
             trigger=IntervalTrigger(minutes=settings.parse_interval_minutes),
             id="parse_news",
             name="Parse and send news",
             replace_existing=True,
-            misfire_grace_time=300  # 5 minutes grace time
+            misfire_grace_time=300,  # 5 minutes grace time
+            max_instances=1  # Only one instance can run at a time
+        )
+        
+        self.log_info(
+            "Scheduled parsing job",
+            job_id=job.id,
+            interval_minutes=settings.parse_interval_minutes,
+            next_run=str(job.next_run_time)
         )
         
         # Schedule cleanup tasks
@@ -89,38 +97,53 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
         start_time = datetime.utcnow()
         
         try:
-            self.log_info("Starting news parsing cycle")
+            self.log_info(
+                "Starting news parsing cycle",
+                time=start_time.isoformat(),
+                scheduler_running=self.scheduler.running if self.scheduler else False,
+                jobs_count=len(self.scheduler.get_jobs()) if self.scheduler else 0
+            )
             
             async with db_manager.get_session() as session:
                 article_repo = ArticleRepository(session)
                 all_new_articles = []
                 
-                # Try HackerNews first
+                # Try RSS feeds first (most reliable)
                 raw_articles = []
                 try:
-                    async with HackerNewsParser() as parser:
+                    async with RSSFeedParser() as parser:
                         raw_articles = await parser.parse_articles()
-                        self.log_info(f"Fetched {len(raw_articles)} articles from HackerNews")
+                        self.log_info(f"Fetched {len(raw_articles)} articles from RSS feeds")
                 except Exception as e:
-                    self.log_error("HackerNews parsing failed", error=str(e))
+                    self.log_error("RSS feeds parsing failed", error=str(e))
                 
-                # If HackerNews failed, try alternative sources
-                if not raw_articles:
+                # If RSS failed or got few articles, try HackerNews
+                if len(raw_articles) < 5:
+                    try:
+                        async with HackerNewsParser() as parser:
+                            hackernews_articles = await parser.parse_articles()
+                            self.log_info(f"Fetched {len(hackernews_articles)} articles from HackerNews")
+                            # Add only unique articles
+                            existing_urls = {a.get("url") for a in raw_articles}
+                            for article in hackernews_articles:
+                                if article.get("url") not in existing_urls:
+                                    raw_articles.append(article)
+                    except Exception as e:
+                        self.log_warning("HackerNews parsing failed", error=str(e))
+                
+                # If still need more articles, try alternative sources
+                if len(raw_articles) < 5:
                     try:
                         async with CybersecurityNewsParser() as parser:
-                            raw_articles = await parser.parse_articles()
-                            self.log_info(f"Fetched {len(raw_articles)} articles from alternative sources")
+                            alt_articles = await parser.parse_articles()
+                            self.log_info(f"Fetched {len(alt_articles)} articles from alternative sources")
+                            # Add only unique articles
+                            existing_urls = {a.get("url") for a in raw_articles}
+                            for article in alt_articles:
+                                if article.get("url") not in existing_urls:
+                                    raw_articles.append(article)
                     except Exception as e:
-                        self.log_error("Alternative sources parsing failed", error=str(e))
-                
-                # If still no articles, try RSS feeds as last resort
-                if not raw_articles:
-                    try:
-                        async with RSSFeedParser() as parser:
-                            raw_articles = await parser.parse_articles()
-                            self.log_info(f"Fetched {len(raw_articles)} articles from RSS feeds")
-                    except Exception as e:
-                        self.log_error("RSS feeds parsing failed", error=str(e))
+                        self.log_warning("Alternative sources parsing failed", error=str(e))
                 
                 # Process articles (English - needs translation)
                 for raw_article in raw_articles[:settings.max_articles_per_fetch]:
@@ -165,8 +188,20 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                 self.log_info(
                     "Parsing cycle completed",
                     new_articles=len(all_new_articles),
-                    duration=(datetime.utcnow() - start_time).total_seconds()
+                    duration=(datetime.utcnow() - start_time).total_seconds(),
+                    next_run_in_minutes=settings.parse_interval_minutes
                 )
+                
+                # Log next scheduled run
+                jobs = self.scheduler.get_jobs()
+                for job in jobs:
+                    if job.id == "parse_news":
+                        self.log_info(
+                            "Next parsing scheduled",
+                            job_id=job.id,
+                            next_run=str(job.next_run_time),
+                            pending=job.pending
+                        )
                 
                 # Send new articles to group
                 for article in all_new_articles:
@@ -211,6 +246,15 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
     async def keep_alive(self):
         """Send keep-alive ping to prevent Render from sleeping."""
         try:
+            # Log scheduler state
+            jobs = self.scheduler.get_jobs() if self.scheduler else []
+            self.log_info(
+                "Keep-alive: Scheduler state",
+                running=self.scheduler.running if self.scheduler else False,
+                jobs_count=len(jobs),
+                jobs_info=[{"id": j.id, "next_run": str(j.next_run_time), "pending": j.pending} for j in jobs]
+            )
+            
             # Ping our own metrics endpoint
             async with aiohttp.ClientSession() as session:
                 async with session.get("http://localhost:8000/metrics", timeout=5) as response:

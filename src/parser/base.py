@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import aiohttp
+import asyncio
+import random
+import os
 from bs4 import BeautifulSoup
 from src.utils import LoggerMixin, MetricsMixin, track_time, PARSER_DURATION
 from src.config import settings
@@ -14,8 +17,16 @@ class BaseParser(ABC, LoggerMixin, MetricsMixin):
         self.session = session
         self._own_session = session is None
         self.timeout = aiohttp.ClientTimeout(total=settings.request_timeout_seconds)
+        # User agent rotation
+        self.user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+        ]
         self.headers = {
-            "User-Agent": settings.user_agent,
+            "User-Agent": random.choice(self.user_agents),
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
             "Accept-Encoding": "gzip, deflate, br",
@@ -36,11 +47,13 @@ class BaseParser(ABC, LoggerMixin, MetricsMixin):
             
             # Create connector with SSL settings
             connector = aiohttp.TCPConnector(
-                ssl=False,  # Disable SSL verification temporarily
+                ssl=False,  # Disable SSL verification for problematic sites
                 limit=100,
                 limit_per_host=30,
+                force_close=True,  # Force close connections
+                enable_cleanup_closed=True,  # Clean up closed connections
                 **connector_kwargs
-            ) if True else None
+            )
             
             # Session kwargs
             session_kwargs = {
@@ -63,20 +76,70 @@ class BaseParser(ABC, LoggerMixin, MetricsMixin):
         if self._own_session and self.session:
             await self.session.close()
     
-    async def fetch_page(self, url: str) -> str:
-        """Fetch HTML content from URL."""
-        try:
-            self.log_debug("Fetching page", url=url, headers=dict(self.session.headers))
-            async with self.session.get(url) as response:
-                self.log_debug("Response received", url=url, status=response.status)
-                response.raise_for_status()
-                return await response.text()
-        except aiohttp.ClientResponseError as e:
-            self.log_error("HTTP error", url=url, status=e.status, error_message=e.message)
-            raise
-        except aiohttp.ClientError as e:
-            self.log_error("Failed to fetch page", url=url, error=str(e), error_type=type(e).__name__)
-            raise
+    async def fetch_page(self, url: str, max_retries: int = 3) -> str:
+        """Fetch HTML content from URL with retry logic."""
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                # Rotate user agent for each attempt
+                headers = self.headers.copy()
+                headers["User-Agent"] = random.choice(self.user_agents)
+                
+                # Add delay between retries
+                if attempt > 0:
+                    delay = min(2 ** attempt, 10)  # Exponential backoff, max 10 seconds
+                    self.log_info(f"Retry attempt {attempt + 1}/{max_retries} after {delay}s delay", url=url)
+                    await asyncio.sleep(delay)
+                
+                self.log_debug("Fetching page", url=url, attempt=attempt + 1)
+                
+                # Use proxy configuration
+                proxy = None
+                if settings.proxy_url:
+                    proxy = settings.proxy_url
+                elif os.getenv('HTTP_PROXY'):
+                    proxy = os.getenv('HTTP_PROXY')
+                elif os.getenv('HTTPS_PROXY'):
+                    proxy = os.getenv('HTTPS_PROXY')
+                
+                async with self.session.get(
+                    url,
+                    headers=headers,
+                    proxy=proxy,
+                    ssl=False,  # Disable SSL verification for problematic sites
+                    allow_redirects=True,
+                    max_redirects=5
+                ) as response:
+                    self.log_debug("Response received", url=url, status=response.status)
+                    
+                    if response.status == 0:
+                        # Connection error, retry
+                        raise aiohttp.ClientConnectionError("Connection failed (status 0)")
+                    
+                    response.raise_for_status()
+                    return await response.text()
+                    
+            except aiohttp.ClientResponseError as e:
+                last_error = e
+                self.log_warning(f"HTTP error on attempt {attempt + 1}", url=url, status=e.status, error_message=e.message)
+                if e.status in [429, 503]:  # Rate limiting or service unavailable
+                    continue
+                elif e.status >= 400 and e.status < 500:
+                    # Client error, no point retrying
+                    raise
+            except (aiohttp.ClientError, aiohttp.ClientConnectionError, asyncio.TimeoutError) as e:
+                last_error = e
+                self.log_warning(f"Connection error on attempt {attempt + 1}", url=url, error=str(e), error_type=type(e).__name__)
+                continue
+            except Exception as e:
+                last_error = e
+                self.log_warning(f"Unexpected error on attempt {attempt + 1}", url=url, error=str(e))
+                continue
+        
+        # All retries failed
+        self.log_error(f"Failed to fetch page after {max_retries} attempts", url=url, error=str(last_error))
+        raise last_error if last_error else Exception(f"Failed to fetch {url}")
     
     def parse_html(self, html: str) -> BeautifulSoup:
         """Parse HTML content."""

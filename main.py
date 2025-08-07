@@ -39,17 +39,43 @@ class Application:
             # Initialize scheduler
             self.scheduler = NewsScheduler(self.bot)
             
-            # Start scheduler
+            # Start scheduler (runs in background)
             await self.scheduler.start()
             
-            # Start bot
+            # Mark as running
             self._running = True
-            await self.bot.start()
+            
+            # Create tasks for bot and keep-alive
+            bot_task = asyncio.create_task(self.bot.start())
+            keep_alive_task = asyncio.create_task(self.keep_alive())
+            
+            # Wait for both tasks (they should run forever)
+            await asyncio.gather(bot_task, keep_alive_task)
             
         except Exception as e:
             logger.error("Failed to start application", error=str(e))
             await self.shutdown()
             raise
+    
+    async def keep_alive(self):
+        """Keep the application alive and monitor scheduler."""
+        while self._running:
+            await asyncio.sleep(60)  # Check every minute
+            
+            # Log scheduler status
+            if self.scheduler and self.scheduler.scheduler:
+                jobs = self.scheduler.scheduler.get_jobs()
+                logger.info(
+                    "Scheduler status check",
+                    running=self.scheduler.scheduler.running,
+                    jobs_count=len(jobs),
+                    jobs=[{"id": job.id, "next_run": str(job.next_run_time)} for job in jobs]
+                )
+            
+            # Ensure scheduler is still running
+            if self.scheduler and not self.scheduler._running:
+                logger.warning("Scheduler stopped unexpectedly, restarting...")
+                await self.scheduler.start()
     
     async def shutdown(self):
         """Shutdown the application gracefully."""
