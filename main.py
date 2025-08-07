@@ -62,30 +62,83 @@ class Application:
     
     async def keep_alive(self):
         """Keep the application alive and monitor scheduler."""
+        import aiohttp
+        import random
+        from datetime import datetime
+        
+        consecutive_failures = 0
+        max_consecutive_failures = 3
+        check_interval = 30  # Check every 30 seconds
+        
+        # Wait a bit before starting
+        await asyncio.sleep(10)
+        
         while self._running:
-            await asyncio.sleep(60)  # Check every minute
-            
-            # Log scheduler status
-            if self.scheduler and self.scheduler.scheduler:
-                jobs = self.scheduler.scheduler.get_jobs()
-                jobs_info = []
-                for job in jobs:
-                    job_info = {"id": job.id}
-                    if hasattr(job, 'next_run_time'):
-                        job_info["next_run"] = str(job.next_run_time)
-                    jobs_info.append(job_info)
+            try:
+                await asyncio.sleep(check_interval)
                 
-                logger.info(
-                    "Scheduler status check",
-                    running=self.scheduler.scheduler.running,
-                    jobs_count=len(jobs),
-                    jobs=jobs_info
-                )
-            
-            # Ensure scheduler is still running
-            if self.scheduler and not self.scheduler._running:
-                logger.warning("Scheduler stopped unexpectedly, restarting...")
-                await self.scheduler.start()
+                # Print heartbeat to stdout to show we're alive
+                current_time = datetime.now().strftime("%H:%M:%S")
+                print(f"[HEARTBEAT {current_time}] Application alive - running={self._running}", flush=True)
+                
+                # Log scheduler status
+                if self.scheduler and self.scheduler.scheduler:
+                    jobs = self.scheduler.scheduler.get_jobs()
+                    jobs_info = []
+                    for job in jobs:
+                        job_info = {"id": job.id}
+                        if hasattr(job, 'next_run_time'):
+                            job_info["next_run"] = str(job.next_run_time)
+                        jobs_info.append(job_info)
+                    
+                    logger.info(
+                        "Scheduler status check",
+                        running=self.scheduler.scheduler.running,
+                        jobs_count=len(jobs),
+                        jobs=jobs_info
+                    )
+                    print(f"[HEARTBEAT {current_time}] Scheduler: running={self.scheduler.scheduler.running}, jobs={len(jobs)}", flush=True)
+                
+                # Ensure scheduler is still running
+                if self.scheduler and not self.scheduler._running:
+                    logger.warning("Scheduler stopped unexpectedly, restarting...")
+                    print(f"[HEARTBEAT {current_time}] WARNING: Scheduler stopped, attempting restart", flush=True)
+                    try:
+                        await self.scheduler.start()
+                        consecutive_failures = 0
+                        print(f"[HEARTBEAT {current_time}] Scheduler restarted successfully", flush=True)
+                    except Exception as e:
+                        consecutive_failures += 1
+                        logger.error(f"Failed to restart scheduler (attempt {consecutive_failures}/{max_consecutive_failures}): {e}")
+                        print(f"[HEARTBEAT {current_time}] ERROR: Failed to restart scheduler: {e}", flush=True)
+                        
+                        if consecutive_failures >= max_consecutive_failures:
+                            logger.critical("Too many scheduler restart failures, shutting down")
+                            print(f"[HEARTBEAT {current_time}] CRITICAL: Too many failures, shutting down", flush=True)
+                            self._running = False
+                            break
+                else:
+                    consecutive_failures = 0
+                
+                # Every few heartbeats, make an external self-ping to generate traffic
+                if random.random() < 0.3:  # 30% chance
+                    try:
+                        async with aiohttp.ClientSession() as session:
+                            endpoints = ["/ping", "/alive", "/heartbeat", "/api/status"]
+                            endpoint = random.choice(endpoints)
+                            url = f"http://localhost:{settings.metrics_port}{endpoint}"
+                            
+                            async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                                if resp.status == 200:
+                                    print(f"[HEARTBEAT {current_time}] External self-ping to {endpoint} successful", flush=True)
+                                else:
+                                    print(f"[HEARTBEAT {current_time}] External self-ping to {endpoint} failed: {resp.status}", flush=True)
+                    except Exception as e:
+                        print(f"[HEARTBEAT {current_time}] External self-ping error: {e}", flush=True)
+                        
+            except Exception as e:
+                logger.error(f"Error in keep_alive loop: {e}")
+                print(f"[HEARTBEAT] ERROR in loop: {e}", flush=True)
     
     async def shutdown(self):
         """Shutdown the application gracefully."""
@@ -121,8 +174,9 @@ async def main():
     # Setup signal handlers
     def signal_handler(sig, frame):
         logger.info("Received signal", signal=sig)
+        print(f"[SHUTDOWN] Received signal {sig}, shutting down gracefully", flush=True)
         asyncio.create_task(app.shutdown())
-        sys.exit(0)
+        # Don't call sys.exit immediately - let the async shutdown complete
     
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -143,6 +197,9 @@ if __name__ == "__main__":
     import os
     os.environ['PYTHONUNBUFFERED'] = '1'
     
-    print(f"[INIT] Starting application...", flush=True)
+    print(f"[INIT] Starting MegaCyberBot application...", flush=True)
+    print(f"[INIT] Keep-alive strategy: Multiple endpoints, self-ping, heartbeat every 30s", flush=True)
+    print(f"[INIT] External monitoring should ping every 5 minutes to various endpoints", flush=True)
+    
     # Run the application
     asyncio.run(main())
