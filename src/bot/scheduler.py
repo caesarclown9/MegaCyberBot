@@ -96,12 +96,16 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
         """Parse news and send to users."""
         if self._parsing_in_progress:
             self.log_info("Parsing already in progress, skipping")
+            print(f"[{datetime.utcnow().isoformat()}] Parsing already in progress, skipping", flush=True)
             return
         
         self._parsing_in_progress = True
         start_time = datetime.utcnow()
         
         try:
+            # Add direct print for immediate visibility
+            print(f"[{start_time.isoformat()}] Starting news parsing cycle", flush=True)
+            
             self.log_info(
                 "Starting news parsing cycle",
                 time=start_time.isoformat(),
@@ -190,6 +194,9 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                     len(all_new_articles)
                 )
                 
+                # Add direct print for immediate visibility
+                print(f"[{datetime.utcnow().isoformat()}] Parsing cycle completed: {len(all_new_articles)} new articles", flush=True)
+                
                 self.log_info(
                     "Parsing cycle completed",
                     new_articles=len(all_new_articles),
@@ -217,6 +224,7 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                     await asyncio.sleep(2)
                     
         except Exception as e:
+            print(f"[{datetime.utcnow().isoformat()}] ERROR in parsing cycle: {str(e)}", flush=True)
             self.log_error("Error in parsing cycle", error=str(e))
             self.increment_counter(ARTICLES_PARSED, {"status": "error"})
             
@@ -263,6 +271,9 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                 if hasattr(j, 'next_run_time'):
                     job_info["next_run"] = str(j.next_run_time)
                 jobs_info.append(job_info)
+            
+            # Add direct print for immediate visibility
+            print(f"[{datetime.utcnow().isoformat()}] Keep-alive: {len(jobs)} jobs scheduled", flush=True)
             
             self.log_info(
                 "Keep-alive: Scheduler state",

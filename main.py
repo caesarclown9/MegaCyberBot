@@ -24,6 +24,7 @@ class Application:
         try:
             # Setup logging
             setup_logging()
+            print(f"[STARTUP] Starting HackerNews Telegram Bot - Environment: {settings.environment}", flush=True)
             logger.info("Starting HackerNews Telegram Bot", environment=settings.environment)
             
             # Initialize metrics
@@ -138,5 +139,10 @@ async def main():
 
 
 if __name__ == "__main__":
+    # Force unbuffered output
+    import os
+    os.environ['PYTHONUNBUFFERED'] = '1'
+    
+    print(f"[INIT] Starting application...", flush=True)
     # Run the application
     asyncio.run(main())

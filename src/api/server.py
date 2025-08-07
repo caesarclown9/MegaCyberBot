@@ -73,7 +73,7 @@ class APIServer:
                 status=401
             )
         
-        # Check if scheduler is available
+        # Check if scheduler is available and running
         if not self.scheduler:
             logger.error("Parse request failed: scheduler not available")
             return web.json_response(
@@ -81,9 +81,23 @@ class APIServer:
                 status=503
             )
         
+        # Check if scheduler is actually running and restart if needed
+        if not self.scheduler._running or not self.scheduler.scheduler.running:
+            logger.warning("Scheduler not running, attempting to restart")
+            try:
+                await self.scheduler.start()
+                logger.info("Scheduler restarted successfully")
+            except Exception as e:
+                logger.error(f"Failed to restart scheduler: {e}")
+                return web.json_response(
+                    {"error": "Scheduler not running and failed to restart"},
+                    status=503
+                )
+        
         try:
             # Check if parse is already running
             if hasattr(self.scheduler, '_parsing_in_progress') and self.scheduler._parsing_in_progress:
+                print(f"[API] Parse request skipped: already in progress", flush=True)
                 logger.info("Parse request skipped: already in progress")
                 return web.json_response({
                     "status": "already_running",
@@ -91,6 +105,7 @@ class APIServer:
                 })
             
             # Start parsing in background
+            print(f"[API] Manual parse triggered via API endpoint", flush=True)
             logger.info("Manual parse triggered via API")
             asyncio.create_task(self.scheduler.parse_and_send_news())
             
