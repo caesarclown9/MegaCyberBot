@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 import aiohttp
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -22,13 +22,27 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
         self.translator = TranslationService()
         self._running = False
         self._parsing_in_progress = False
+        # Kyrgyzstan timezone (UTC+6)
+        self.kg_timezone = timezone(timedelta(hours=6))
+        self.quiet_hours_start = 22  # 22:00 KG time
+        self.quiet_hours_end = 10    # 10:00 KG time
     
     async def start(self):
         """Start the scheduler."""
         if self._running:
             return
         
-        self.log_info("Starting news scheduler")
+        # Log quiet hours info
+        kg_time = self.get_kg_time()
+        is_quiet = self.is_quiet_hours()
+        self.log_info(
+            "Starting news scheduler",
+            quiet_hours=f"{self.quiet_hours_start}:00 - {self.quiet_hours_end}:00 KG time",
+            current_kg_time=kg_time.strftime("%H:%M:%S"),
+            quiet_hours_active=is_quiet
+        )
+        print(f"[SCHEDULER] Quiet hours: {self.quiet_hours_start}:00 - {self.quiet_hours_end}:00 KG time", flush=True)
+        print(f"[SCHEDULER] Current KG time: {kg_time.strftime('%H:%M:%S')} | Quiet hours active: {is_quiet}", flush=True)
         
         # Initialize database
         await db_manager.init()
@@ -217,11 +231,33 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                             next_run=next_run
                         )
                 
-                # Send new articles to group
-                for article in all_new_articles:
-                    await self.bot.send_article_to_group(article)
-                    # Small delay between articles
-                    await asyncio.sleep(2)
+                # Check if it's quiet hours before sending
+                if self.is_quiet_hours():
+                    self.log_info(
+                        "Quiet hours active, postponing article sending",
+                        kg_time=self.get_kg_time().strftime("%H:%M"),
+                        articles_count=len(all_new_articles)
+                    )
+                    print(f"[QUIET HOURS] Not sending {len(all_new_articles)} articles (KG time: {self.get_kg_time().strftime('%H:%M')})", flush=True)
+                    
+                    # Mark articles as pending to send them later
+                    for article in all_new_articles:
+                        await article_repo.mark_as_pending(article.id)
+                else:
+                    # Send new articles to group
+                    for article in all_new_articles:
+                        await self.bot.send_article_to_group(article)
+                        # Small delay between articles
+                        await asyncio.sleep(2)
+                
+                # Also check for pending articles from quiet hours
+                if not self.is_quiet_hours():
+                    pending_articles = await article_repo.get_pending_articles()
+                    if pending_articles:
+                        self.log_info(f"Sending {len(pending_articles)} pending articles from quiet hours")
+                        for article in pending_articles:
+                            await self.bot.send_article_to_group(article)
+                            await asyncio.sleep(2)
                     
         except Exception as e:
             print(f"[{datetime.utcnow().isoformat()}] ERROR in parsing cycle: {str(e)}", flush=True)
@@ -260,6 +296,23 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
         except Exception as e:
             self.log_error("Cleanup failed", error=str(e))
     
+    def get_kg_time(self) -> datetime:
+        """Get current time in Kyrgyzstan timezone."""
+        return datetime.now(self.kg_timezone)
+    
+    def is_quiet_hours(self) -> bool:
+        """Check if current time is within quiet hours (22:00-10:00 KG time)."""
+        kg_time = self.get_kg_time()
+        current_hour = kg_time.hour
+        
+        # Quiet hours: from 22:00 to 10:00 (crosses midnight)
+        if self.quiet_hours_start > self.quiet_hours_end:
+            # Hours cross midnight (e.g., 22:00 to 10:00)
+            return current_hour >= self.quiet_hours_start or current_hour < self.quiet_hours_end
+        else:
+            # Hours don't cross midnight
+            return self.quiet_hours_start <= current_hour < self.quiet_hours_end
+    
     async def keep_alive(self):
         """Send keep-alive ping to prevent Render from sleeping."""
         try:
@@ -272,14 +325,20 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                     job_info["next_run"] = str(j.next_run_time)
                 jobs_info.append(job_info)
             
+            # Add current KG time and quiet hours status
+            kg_time = self.get_kg_time()
+            quiet_hours = self.is_quiet_hours()
+            
             # Add direct print for immediate visibility
-            print(f"[{datetime.utcnow().isoformat()}] Keep-alive: {len(jobs)} jobs scheduled", flush=True)
+            print(f"[{datetime.utcnow().isoformat()}] Keep-alive: {len(jobs)} jobs scheduled | KG time: {kg_time.strftime('%H:%M')} | Quiet: {quiet_hours}", flush=True)
             
             self.log_info(
                 "Keep-alive: Scheduler state",
                 running=self.scheduler.running if self.scheduler else False,
                 jobs_count=len(jobs),
-                jobs_info=jobs_info
+                jobs_info=jobs_info,
+                kg_time=kg_time.strftime("%H:%M:%S"),
+                quiet_hours_active=quiet_hours
             )
             
             # Ping our own metrics endpoint
