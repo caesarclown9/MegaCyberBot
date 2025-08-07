@@ -61,6 +61,9 @@ class Settings(BaseSettings):
         default="development"
     )
     
+    # API
+    parse_api_key: Optional[str] = Field(default=None, description="API key for manual parse trigger")
+    
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, v: str) -> str:

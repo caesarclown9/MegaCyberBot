@@ -2,10 +2,10 @@ import asyncio
 import signal
 import sys
 from typing import Optional
-from prometheus_client import start_http_server
 from src.config import settings
 from src.utils import setup_logging, get_logger, init_metrics
 from src.bot import TelegramBot, NewsScheduler
+from src.api import APIServer
 
 logger = get_logger(__name__)
 
@@ -16,6 +16,7 @@ class Application:
     def __init__(self):
         self.bot: Optional[TelegramBot] = None
         self.scheduler: Optional[NewsScheduler] = None
+        self.api_server: Optional[APIServer] = None
         self._running = False
     
     async def start(self):
@@ -28,16 +29,17 @@ class Application:
             # Initialize metrics
             init_metrics()
             
-            # Start metrics server
-            if settings.enable_metrics:
-                start_http_server(settings.metrics_port)
-                logger.info("Metrics server started", port=settings.metrics_port)
-            
             # Initialize bot
             self.bot = TelegramBot()
             
             # Initialize scheduler
             self.scheduler = NewsScheduler(self.bot)
+            
+            # Initialize and start API server
+            if settings.enable_metrics:
+                self.api_server = APIServer(scheduler=self.scheduler)
+                await self.api_server.start(port=settings.metrics_port)
+                logger.info("API server started with metrics", port=settings.metrics_port)
             
             # Start scheduler (runs in background)
             await self.scheduler.start()
@@ -100,6 +102,10 @@ class Application:
             # Stop scheduler
             if self.scheduler:
                 await self.scheduler.stop()
+            
+            # Stop API server
+            if self.api_server:
+                await self.api_server.stop()
             
             logger.info("Application shutdown complete")
             

@@ -21,6 +21,7 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
         self.parsers = []
         self.translator = TranslationService()
         self._running = False
+        self._parsing_in_progress = False
     
     async def start(self):
         """Start the scheduler."""
@@ -93,6 +94,11 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
     
     async def parse_and_send_news(self):
         """Parse news and send to users."""
+        if self._parsing_in_progress:
+            self.log_info("Parsing already in progress, skipping")
+            return
+        
+        self._parsing_in_progress = True
         start_time = datetime.utcnow()
         
         try:
@@ -218,6 +224,8 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
             await self.bot.send_admin_notification(
                 f"❌ Ошибка парсинга:\n{str(e)[:200]}"
             )
+        finally:
+            self._parsing_in_progress = False
     
     async def cleanup_old_data(self):
         """Clean up old articles and cache."""
