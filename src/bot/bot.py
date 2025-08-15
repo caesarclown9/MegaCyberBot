@@ -70,12 +70,12 @@ class TelegramBot(LoggerMixin, MetricsMixin):
             
             # Determine which group and topic to send to
             if target_group == "vulnerabilities":
-                # Use vulnerabilities group if configured, otherwise use main group
-                group_id = settings.telegram_vulnerabilities_group_id or settings.telegram_group_id
+                # Always use vulnerabilities group for vulnerability news
+                group_id = settings.telegram_vulnerabilities_group_id
                 group_type = "vulnerabilities"
-                # Use vulnerabilities topic if configured
                 topic_id = settings.telegram_vulnerabilities_topic_id
             else:
+                # Use general group for all other news
                 group_id = settings.telegram_group_id
                 group_type = "general"
                 topic_id = settings.telegram_topic_id

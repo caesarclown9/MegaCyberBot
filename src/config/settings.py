@@ -11,11 +11,13 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    # Telegram
+    # Telegram - General news group
     telegram_bot_token: str = Field(..., description="Telegram bot token")
-    telegram_group_id: int = Field(..., description="Telegram group/channel ID where to send news")
-    telegram_vulnerabilities_group_id: Optional[int] = Field(None, description="Telegram group/channel ID for vulnerability news")
-    telegram_topic_id: Optional[int] = Field(None, description="Topic ID for forum supergroups")
+    telegram_group_id: int = Field(..., description="Telegram group/channel ID for general cybersecurity news")
+    telegram_topic_id: Optional[int] = Field(None, description="Topic ID for general news in forum supergroups")
+    
+    # Telegram - Vulnerabilities group
+    telegram_vulnerabilities_group_id: int = Field(..., description="Telegram group/channel ID for vulnerability news")
     telegram_vulnerabilities_topic_id: Optional[int] = Field(None, description="Topic ID for vulnerability news in forum supergroups")
     
     # Database
@@ -27,6 +29,7 @@ class Settings(BaseSettings):
     # Parser
     parse_interval_minutes: int = Field(default=120, ge=5, le=1440)  # 2 hours
     max_articles_per_fetch: int = Field(default=10, ge=1, le=50)
+    max_articles_per_category: int = Field(default=5, ge=1, le=25, description="Max articles per category (general/vulnerabilities)")
     request_timeout_seconds: int = Field(default=30, ge=5, le=120)
     min_article_date: str = Field(default="2025-08-01", description="Minimum article date (YYYY-MM-DD)")
     user_agent: str = Field(

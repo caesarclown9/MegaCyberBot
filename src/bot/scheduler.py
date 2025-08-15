@@ -171,9 +171,23 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                         self.log_warning("Alternative sources parsing failed", error=str(e))
                 
                 # Process articles (English - needs translation)
-                for raw_article in raw_articles[:settings.max_articles_per_fetch]:
+                # Track articles per category
+                vulnerabilities_count = 0
+                general_count = 0
+                max_per_category = settings.max_articles_per_category
+                
+                for raw_article in raw_articles:
                     if await article_repo.exists(raw_article["url"]):
                         continue
+                    
+                    # Check if we've reached the limit for both categories
+                    if vulnerabilities_count >= max_per_category and general_count >= max_per_category:
+                        self.log_info(
+                            "Reached article limit for both categories",
+                            vulnerabilities=vulnerabilities_count,
+                            general=general_count
+                        )
+                        break
                     
                     try:
                         # Store original English content
@@ -188,12 +202,31 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                         category = self.categorizer.categorize(raw_article)
                         raw_article["category"] = category.value
                         
+                        # Check if we've reached the limit for this category
+                        if category.value == ArticleCategory.VULNERABILITIES.value:
+                            if vulnerabilities_count >= max_per_category:
+                                self.log_debug(
+                                    "Skipping vulnerability article - limit reached",
+                                    title=raw_article.get("title", "")[:50]
+                                )
+                                continue
+                            vulnerabilities_count += 1
+                        else:
+                            if general_count >= max_per_category:
+                                self.log_debug(
+                                    "Skipping general article - limit reached",
+                                    title=raw_article.get("title", "")[:50]
+                                )
+                                continue
+                            general_count += 1
+                        
                         # Log categorization decision
                         self.log_info(
                             "Article categorized",
                             title=raw_article.get("title", "")[:50],
                             category=category.value,
-                            source=raw_article.get("source")
+                            source=raw_article.get("source"),
+                            category_count=f"vuln:{vulnerabilities_count}/{max_per_category}, gen:{general_count}/{max_per_category}"
                         )
                         
                         # Translate to Russian
@@ -226,9 +259,15 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                 # Add direct print for immediate visibility
                 print(f"[{datetime.utcnow().isoformat()}] Parsing cycle completed: {len(all_new_articles)} new articles", flush=True)
                 
+                # Count articles by category
+                vuln_articles = [a for a in all_new_articles if getattr(a, 'category', 'general') == ArticleCategory.VULNERABILITIES.value]
+                gen_articles = [a for a in all_new_articles if getattr(a, 'category', 'general') == ArticleCategory.GENERAL.value]
+                
                 self.log_info(
                     "Parsing cycle completed",
                     new_articles=len(all_new_articles),
+                    vulnerabilities=len(vuln_articles),
+                    general=len(gen_articles),
                     duration=(datetime.utcnow() - start_time).total_seconds(),
                     next_run_in_minutes=settings.parse_interval_minutes
                 )
@@ -265,14 +304,13 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                         target_group = "general"
                         if hasattr(article, 'category'):
                             if article.category == ArticleCategory.VULNERABILITIES.value:
-                                # Send to vulnerabilities group/topic if configured
-                                if settings.telegram_vulnerabilities_group_id or settings.telegram_vulnerabilities_topic_id:
-                                    target_group = "vulnerabilities"
-                                    self.log_info(
-                                        "Sending vulnerability article",
-                                        article_id=article.id,
-                                        title=article.title[:50]
-                                    )
+                                # Always send vulnerabilities to the vulnerabilities group
+                                target_group = "vulnerabilities"
+                                self.log_info(
+                                    "Sending vulnerability article",
+                                    article_id=article.id,
+                                    title=article.title[:50]
+                                )
                         
                         await self.bot.send_article_to_group(article, target_group)
                         # Small delay between articles
@@ -288,8 +326,7 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                             target_group = "general"
                             if hasattr(article, 'category'):
                                 if article.category == ArticleCategory.VULNERABILITIES.value:
-                                    if settings.telegram_vulnerabilities_group_id or settings.telegram_vulnerabilities_topic_id:
-                                        target_group = "vulnerabilities"
+                                    target_group = "vulnerabilities"
                             
                             await self.bot.send_article_to_group(article, target_group)
                             await asyncio.sleep(2)
