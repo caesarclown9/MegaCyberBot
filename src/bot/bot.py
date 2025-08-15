@@ -68,19 +68,24 @@ class TelegramBot(LoggerMixin, MetricsMixin):
         async with db_manager.get_session() as session:
             article_repo = ArticleRepository(session)
             
-            # Determine which group to send to
-            if target_group == "vulnerabilities" and settings.telegram_vulnerabilities_group_id:
-                group_id = settings.telegram_vulnerabilities_group_id
+            # Determine which group and topic to send to
+            if target_group == "vulnerabilities":
+                # Use vulnerabilities group if configured, otherwise use main group
+                group_id = settings.telegram_vulnerabilities_group_id or settings.telegram_group_id
                 group_type = "vulnerabilities"
+                # Use vulnerabilities topic if configured
+                topic_id = settings.telegram_vulnerabilities_topic_id
             else:
                 group_id = settings.telegram_group_id
                 group_type = "general"
+                topic_id = settings.telegram_topic_id
             
             self.log_info(
                 "Sending article to group",
                 article_id=article.id,
                 group_id=group_id,
                 group_type=group_type,
+                topic_id=topic_id,
                 category=getattr(article, 'category', 'unknown')
             )
             
@@ -97,8 +102,8 @@ class TelegramBot(LoggerMixin, MetricsMixin):
                 }
                 
                 # Add topic_id if configured for forum supergroups
-                if settings.telegram_topic_id:
-                    message_params["message_thread_id"] = settings.telegram_topic_id
+                if topic_id:
+                    message_params["message_thread_id"] = topic_id
                 
                 await self.bot.send_message(**message_params)
                 

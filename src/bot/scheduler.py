@@ -265,8 +265,8 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                         target_group = "general"
                         if hasattr(article, 'category'):
                             if article.category == ArticleCategory.VULNERABILITIES.value:
-                                # Only send to vulnerabilities group if it's configured
-                                if settings.telegram_vulnerabilities_group_id:
+                                # Send to vulnerabilities group/topic if configured
+                                if settings.telegram_vulnerabilities_group_id or settings.telegram_vulnerabilities_topic_id:
                                     target_group = "vulnerabilities"
                                     self.log_info(
                                         "Sending vulnerability article",
@@ -288,7 +288,7 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                             target_group = "general"
                             if hasattr(article, 'category'):
                                 if article.category == ArticleCategory.VULNERABILITIES.value:
-                                    if settings.telegram_vulnerabilities_group_id:
+                                    if settings.telegram_vulnerabilities_group_id or settings.telegram_vulnerabilities_topic_id:
                                         target_group = "vulnerabilities"
                             
                             await self.bot.send_article_to_group(article, target_group)

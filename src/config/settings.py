@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     telegram_group_id: int = Field(..., description="Telegram group/channel ID where to send news")
     telegram_vulnerabilities_group_id: Optional[int] = Field(None, description="Telegram group/channel ID for vulnerability news")
     telegram_topic_id: Optional[int] = Field(None, description="Topic ID for forum supergroups")
+    telegram_vulnerabilities_topic_id: Optional[int] = Field(None, description="Topic ID for vulnerability news in forum supergroups")
     
     # Database
     database_url: str = Field(
