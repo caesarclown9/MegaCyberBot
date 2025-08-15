@@ -58,12 +58,31 @@ class TelegramBot(LoggerMixin, MetricsMixin):
         except Exception as e:
             self.log_error("Error stopping bot", error=str(e))
     
-    async def send_article_to_group(self, article):
-        """Send article to configured Telegram group."""
+    async def send_article_to_group(self, article, target_group: str = "general"):
+        """Send article to configured Telegram group based on category.
+        
+        Args:
+            article: Article object to send
+            target_group: 'general' or 'vulnerabilities' to determine which group to send to
+        """
         async with db_manager.get_session() as session:
             article_repo = ArticleRepository(session)
             
-            self.log_info("Sending article to group", article_id=article.id, group_id=settings.telegram_group_id)
+            # Determine which group to send to
+            if target_group == "vulnerabilities" and settings.telegram_vulnerabilities_group_id:
+                group_id = settings.telegram_vulnerabilities_group_id
+                group_type = "vulnerabilities"
+            else:
+                group_id = settings.telegram_group_id
+                group_type = "general"
+            
+            self.log_info(
+                "Sending article to group",
+                article_id=article.id,
+                group_id=group_id,
+                group_type=group_type,
+                category=getattr(article, 'category', 'unknown')
+            )
             
             # Format article text
             text = self._format_article(article)
@@ -71,7 +90,7 @@ class TelegramBot(LoggerMixin, MetricsMixin):
             try:
                 # Send to group
                 message_params = {
-                    "chat_id": settings.telegram_group_id,
+                    "chat_id": group_id,
                     "text": text,
                     "parse_mode": ParseMode.MARKDOWN,
                     "disable_web_page_preview": True
@@ -89,22 +108,27 @@ class TelegramBot(LoggerMixin, MetricsMixin):
                 
                 self.increment_counter(
                     TELEGRAM_MESSAGES,
-                    {"type": "group_post", "status": "success"}
+                    {"type": "group_post", "status": "success", "group": group_type}
                 )
                 
-                self.log_info("Article sent to group successfully", article_id=article.id)
+                self.log_info(
+                    "Article sent to group successfully",
+                    article_id=article.id,
+                    group_type=group_type
+                )
                 
             except Exception as e:
                 self.log_error(
                     "Failed to send article to group",
                     article_id=article.id,
-                    group_id=settings.telegram_group_id,
+                    group_id=group_id,
+                    group_type=group_type,
                     error=str(e)
                 )
                 
                 self.increment_counter(
                     TELEGRAM_MESSAGES,
-                    {"type": "group_post", "status": "error"}
+                    {"type": "group_post", "status": "error", "group": group_type}
                 )
                 
                 raise

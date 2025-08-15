@@ -9,6 +9,7 @@ from src.utils import LoggerMixin, MetricsMixin, ARTICLES_PARSED
 from src.database import db_manager, get_db_session, ArticleRepository
 from src.parser import HackerNewsParser, CybersecurityNewsParser, RSSFeedParser
 from src.utils import TranslationService
+from src.utils.categorizer import ArticleCategorizer, ArticleCategory
 from .bot import TelegramBot
 
 
@@ -20,6 +21,7 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
         self.scheduler = AsyncIOScheduler()
         self.parsers = []
         self.translator = TranslationService()
+        self.categorizer = ArticleCategorizer()
         self._running = False
         self._parsing_in_progress = False
         # Kyrgyzstan timezone (UTC+6)
@@ -182,12 +184,25 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                         if not raw_article.get("source"):
                             raw_article["source"] = "HackerNews"
                         
+                        # Categorize the article
+                        category = self.categorizer.categorize(raw_article)
+                        raw_article["category"] = category.value
+                        
+                        # Log categorization decision
+                        self.log_info(
+                            "Article categorized",
+                            title=raw_article.get("title", "")[:50],
+                            category=category.value,
+                            source=raw_article.get("source")
+                        )
+                        
                         # Translate to Russian
                         translated_article = await self.translator.translate_article(raw_article)
                         
                         # Store Russian translations
                         translated_article["title_ru"] = translated_article.get("title")
                         translated_article["description_ru"] = translated_article.get("description")
+                        translated_article["category"] = category.value  # Preserve category after translation
                         
                         article = await article_repo.create(translated_article)
                         all_new_articles.append(article)
@@ -244,9 +259,22 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                     for article in all_new_articles:
                         await article_repo.mark_as_pending(article.id)
                 else:
-                    # Send new articles to group
+                    # Send new articles to appropriate groups based on category
                     for article in all_new_articles:
-                        await self.bot.send_article_to_group(article)
+                        # Determine target group based on category
+                        target_group = "general"
+                        if hasattr(article, 'category'):
+                            if article.category == ArticleCategory.VULNERABILITIES.value:
+                                # Only send to vulnerabilities group if it's configured
+                                if settings.telegram_vulnerabilities_group_id:
+                                    target_group = "vulnerabilities"
+                                    self.log_info(
+                                        "Sending vulnerability article",
+                                        article_id=article.id,
+                                        title=article.title[:50]
+                                    )
+                        
+                        await self.bot.send_article_to_group(article, target_group)
                         # Small delay between articles
                         await asyncio.sleep(2)
                 
@@ -256,7 +284,14 @@ class NewsScheduler(LoggerMixin, MetricsMixin):
                     if pending_articles:
                         self.log_info(f"Sending {len(pending_articles)} pending articles from quiet hours")
                         for article in pending_articles:
-                            await self.bot.send_article_to_group(article)
+                            # Determine target group based on category for pending articles too
+                            target_group = "general"
+                            if hasattr(article, 'category'):
+                                if article.category == ArticleCategory.VULNERABILITIES.value:
+                                    if settings.telegram_vulnerabilities_group_id:
+                                        target_group = "vulnerabilities"
+                            
+                            await self.bot.send_article_to_group(article, target_group)
                             await asyncio.sleep(2)
                     
         except Exception as e:

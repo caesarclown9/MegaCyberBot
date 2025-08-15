@@ -11,6 +11,7 @@ from .metrics import (
     ACTIVE_USERS,
 )
 from .translator import TranslationService
+from .categorizer import ArticleCategorizer, ArticleCategory
 
 __all__ = [
     "setup_logging",
@@ -26,4 +27,6 @@ __all__ = [
     "TRANSLATION_DURATION",
     "ACTIVE_USERS",
     "TranslationService",
+    "ArticleCategorizer",
+    "ArticleCategory",
 ]

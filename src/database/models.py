@@ -23,9 +23,11 @@ class Article(Base):
     sent_at = Column(DateTime, nullable=True)
     is_sent = Column(Boolean, default=False, nullable=False, index=True)
     source = Column(String(50), nullable=True, index=True)
+    category = Column(String(50), nullable=True, index=True, default="general")
     
     __table_args__ = (
         Index("idx_is_sent_published", "is_sent", "published_at"),
+        Index("idx_category_sent", "category", "is_sent"),
     )
     
     def __repr__(self) -> str:
