@@ -22,7 +22,7 @@ TRANSLATION_REQUESTS = Counter(
 TELEGRAM_MESSAGES = Counter(
     "telegram_messages_sent_total",
     "Total number of Telegram messages sent",
-    ["type", "status"]
+    ["type", "status", "group"]
 )
 
 PARSER_DURATION = Histogram(
