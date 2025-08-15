@@ -6,6 +6,7 @@ from src.config import settings
 from src.utils import setup_logging, get_logger, init_metrics
 from src.bot import TelegramBot, NewsScheduler
 from src.api import APIServer
+from src.database import db_manager, DatabaseMigrator
 
 logger = get_logger(__name__)
 
@@ -29,6 +30,21 @@ class Application:
             
             # Initialize metrics
             init_metrics()
+            
+            # Run database migrations automatically
+            logger.info("Running database migrations...")
+            print("[STARTUP] Checking database migrations...", flush=True)
+            try:
+                await db_manager.init()
+                async with db_manager.get_session() as session:
+                    migrator = DatabaseMigrator()
+                    await migrator.run_migrations(session)
+                    await session.commit()
+                print("[STARTUP] Database migrations completed", flush=True)
+            except Exception as e:
+                logger.warning(f"Migration check completed with warning: {e}")
+                print(f"[STARTUP] Migration check completed (non-critical): {e}", flush=True)
+                # Continue anyway - migrations might already be applied
             
             # Initialize bot
             self.bot = TelegramBot()
