@@ -33,26 +33,3 @@ class Article(Base):
     def __repr__(self) -> str:
         return f"<Article(id={self.id}, title={self.title[:50]}...)>"
 
-
-class User(Base):
-    __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    telegram_id = Column(Integer, unique=True, nullable=False, index=True)
-    username = Column(String(255), nullable=True)
-    first_name = Column(String(255), nullable=True)
-    last_name = Column(String(255), nullable=True)
-    language_code = Column(String(10), nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False, index=True)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-    last_seen_at = Column(DateTime, server_default=func.now(), nullable=False)
-    
-    __table_args__ = (
-        Index("idx_active_created", "is_active", "created_at"),
-    )
-    
-    def __repr__(self) -> str:
-        return f"<User(id={self.id}, telegram_id={self.telegram_id}, username={self.username})>"
-
-

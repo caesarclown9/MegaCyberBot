@@ -9,6 +9,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # Telegram - General news group
@@ -22,8 +23,8 @@ class Settings(BaseSettings):
     
     # Database
     database_url: str = Field(
-        default="sqlite+aiosqlite:///./data/bot.db",
-        description="Database connection URL"
+        ...,  # Required field, no default
+        description="Database connection URL (PostgreSQL/Supabase)"
     )
     
     # Parser

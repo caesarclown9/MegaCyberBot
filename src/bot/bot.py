@@ -6,7 +6,7 @@ from aiogram.client.bot import DefaultBotProperties
 from aiogram.enums import ParseMode
 from src.config import settings
 from src.utils import LoggerMixin, MetricsMixin, TELEGRAM_MESSAGES, ACTIVE_USERS
-from src.database import db_manager, UserRepository, ArticleRepository
+from src.database import db_manager, ArticleRepository
 from .handlers import router
 
 

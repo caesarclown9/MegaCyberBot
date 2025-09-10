@@ -4,7 +4,7 @@ import hashlib
 from sqlalchemy import select, update, delete, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.utils import LoggerMixin, MetricsMixin
-from .models import Article, User
+from .models import Article
 
 
 class BaseRepository(LoggerMixin, MetricsMixin):
@@ -102,76 +102,6 @@ class ArticleRepository(BaseRepository):
         return list(result.scalars().all())
 
 
-class UserRepository(BaseRepository):
-    """Repository for user operations."""
-    
-    async def create_or_update(self, user_data: Dict[str, Any]) -> User:
-        """Create or update user."""
-        telegram_id = user_data["telegram_id"]
-        
-        result = await self.session.execute(
-            select(User).where(User.telegram_id == telegram_id)
-        )
-        user = result.scalar_one_or_none()
-        
-        if user:
-            # Update existing user
-            for key, value in user_data.items():
-                setattr(user, key, value)
-            user.last_seen_at = datetime.utcnow()
-            self.log_info("User updated", telegram_id=telegram_id)
-        else:
-            # Create new user
-            user = User(**user_data)
-            self.session.add(user)
-            self.log_info("User created", telegram_id=telegram_id)
-        
-        await self.session.flush()
-        return user
-    
-    async def get_by_telegram_id(self, telegram_id: int) -> Optional[User]:
-        """Get user by Telegram ID."""
-        result = await self.session.execute(
-            select(User).where(User.telegram_id == telegram_id)
-        )
-        return result.scalar_one_or_none()
-    
-    async def get_active_users(self) -> List[User]:
-        """Get all active users."""
-        result = await self.session.execute(
-            select(User).where(User.is_active == True)
-        )
-        return list(result.scalars().all())
-    
-    async def deactivate(self, telegram_id: int) -> bool:
-        """Deactivate user."""
-        result = await self.session.execute(
-            update(User)
-            .where(User.telegram_id == telegram_id)
-            .values(is_active=False, updated_at=datetime.utcnow())
-        )
-        success = result.rowcount > 0
-        if success:
-            self.log_info("User deactivated", telegram_id=telegram_id)
-        return success
-    
-    async def activate(self, telegram_id: int) -> bool:
-        """Activate user."""
-        result = await self.session.execute(
-            update(User)
-            .where(User.telegram_id == telegram_id)
-            .values(is_active=True, updated_at=datetime.utcnow())
-        )
-        success = result.rowcount > 0
-        if success:
-            self.log_info("User activated", telegram_id=telegram_id)
-        return success
-    
-    async def count_active_users(self) -> int:
-        """Count active users."""
-        result = await self.session.execute(
-            select(func.count()).select_from(User).where(User.is_active == True)
-        )
-        return result.scalar()
+## Note: User entity and related repository were removed as not used by the application.
 
 

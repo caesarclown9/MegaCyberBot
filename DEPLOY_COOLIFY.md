@@ -1,0 +1,157 @@
+# Deployment Guide for Coolify
+
+## Prerequisites
+
+1. Supabase PostgreSQL database
+2. Telegram bot token and group IDs
+3. Coolify instance
+
+## Environment Variables
+
+Set these in Coolify's environment variables section:
+
+### Required Variables
+
+```env
+# Telegram Bot
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_GROUP_ID=-1234567890  # Your general news group ID
+TELEGRAM_VULNERABILITIES_GROUP_ID=-1234567891  # Your vulnerabilities group ID
+
+# Database (Supabase)
+DATABASE_URL=postgresql+asyncpg://postgres.xxxxxxxxxxxx:password@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
+
+# Environment
+ENVIRONMENT=production
+```
+
+### Optional Variables
+
+```env
+# Topics (if using forum supergroups)
+TELEGRAM_TOPIC_ID=
+TELEGRAM_VULNERABILITIES_TOPIC_ID=
+
+# Translation
+MICROSOFT_TRANSLATOR_KEY=
+OPENAI_API_KEY=
+
+# Monitoring
+SENTRY_DSN=
+PARSE_API_KEY=your_secure_api_key
+
+# Proxy (if needed)
+PROXY_URL=
+PROXY_USERNAME=
+PROXY_PASSWORD=
+```
+
+## Coolify Configuration
+
+### 1. Application Settings
+
+- **Build Pack**: Nixpacks (auto-detected as Python)
+- **Port**: 8000 (for health checks and metrics)
+- **Health Check Path**: `/health`
+
+### 2. Health Check Configuration
+
+In Coolify, set:
+- **Health Check Enabled**: Yes
+- **Health Check Path**: `/health`
+- **Health Check Port**: 8000
+- **Health Check Interval**: 30 seconds
+
+### 3. Resource Limits (Recommended)
+
+- **Memory**: 512MB minimum
+- **CPU**: 0.5 cores minimum
+
+## Deployment Steps
+
+1. **Fork/Clone Repository**
+   ```bash
+   git clone https://github.com/caesarclown9/MegaCyberBot.git
+   ```
+
+2. **Set Environment Variables in Coolify**
+   - Go to your application settings
+   - Add all required environment variables
+   - Save configuration
+
+3. **Deploy**
+   - Coolify will automatically detect Python application
+   - Build will use Nixpacks
+   - Container will start with health checks
+
+## Monitoring
+
+### Health Check Endpoints
+
+The bot exposes several endpoints for monitoring:
+
+- `GET /health` - Basic health check
+- `GET /metrics` - Prometheus metrics
+- `GET /status` - Detailed status information
+- `GET /ping` - Simple ping endpoint
+
+### Logs
+
+Check logs in Coolify's log viewer. Look for:
+- `[STARTUP]` - Initialization messages
+- `[HEARTBEAT]` - Periodic health checks
+- `[ERROR]` - Error messages
+
+## Troubleshooting
+
+### Database Connection Issues
+
+1. Check DATABASE_URL format:
+   ```
+   postgresql+asyncpg://user:password@host:port/database
+   ```
+
+2. Ensure Supabase allows connections from Coolify's IP
+
+3. Check logs for connection errors:
+   ```
+   [STARTUP] Database connection attempt X/3 failed
+   ```
+
+### Bot Not Starting
+
+1. Verify TELEGRAM_BOT_TOKEN is correct
+2. Check group IDs are negative numbers
+3. Run debug script locally:
+   ```bash
+   python debug_startup.py
+   ```
+
+### Health Check Failing
+
+1. Check if port 8000 is exposed
+2. Verify metrics are enabled (ENABLE_METRICS=true)
+3. Check application logs for API server startup
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Container keeps restarting | Check environment variables, especially DATABASE_URL |
+| No messages sent | Verify group IDs and bot permissions |
+| Database migrations fail | Check DATABASE_URL and network connectivity |
+| Health check timeout | Increase start_period in health check settings |
+
+## Support
+
+For issues specific to the bot, check:
+- Application logs in Coolify
+- Database connection in Supabase
+- Bot permissions in Telegram groups
+
+## Security Notes
+
+1. Never commit `.env` file to repository
+2. Use strong database passwords
+3. Rotate PARSE_API_KEY regularly
+4. Keep bot token secret

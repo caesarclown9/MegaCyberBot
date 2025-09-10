@@ -33,18 +33,41 @@ class Application:
             
             # Run database migrations automatically
             logger.info("Running database migrations...")
-            print("[STARTUP] Checking database migrations...", flush=True)
-            try:
-                await db_manager.init()
-                async with db_manager.get_session() as session:
-                    migrator = DatabaseMigrator()
-                    await migrator.run_migrations(session)
-                    await session.commit()
-                print("[STARTUP] Database migrations completed", flush=True)
-            except Exception as e:
-                logger.warning(f"Migration check completed with warning: {e}")
-                print(f"[STARTUP] Migration check completed (non-critical): {e}", flush=True)
-                # Continue anyway - migrations might already be applied
+            # Log database connection info (hide password)
+            db_url_parts = settings.database_url.split('@')
+            if len(db_url_parts) > 1:
+                db_info = db_url_parts[0].split('://')[-1].split(':')[0] + '@' + db_url_parts[-1]
+                print(f"[STARTUP] Database: PostgreSQL @ {db_info}", flush=True)
+            else:
+                print(f"[STARTUP] Database configured", flush=True)
+            
+            print("[STARTUP] Initializing database connection...", flush=True)
+            max_retries = 3
+            retry_delay = 5
+            
+            for attempt in range(max_retries):
+                try:
+                    await db_manager.init()
+                    print("[STARTUP] Database connection established", flush=True)
+                    
+                    # Run migrations
+                    print("[STARTUP] Running database migrations...", flush=True)
+                    async with db_manager.get_session() as session:
+                        migrator = DatabaseMigrator()
+                        await migrator.run_migrations(session)
+                        await session.commit()
+                    print("[STARTUP] Database migrations completed successfully", flush=True)
+                    break
+                    
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        print(f"[STARTUP] Database connection attempt {attempt + 1}/{max_retries} failed: {e}", flush=True)
+                        print(f"[STARTUP] Retrying in {retry_delay} seconds...", flush=True)
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        logger.error(f"Failed to connect to database after {max_retries} attempts: {e}")
+                        print(f"[STARTUP] CRITICAL: Could not establish database connection: {e}", flush=True)
+                        raise
             
             # Initialize bot
             self.bot = TelegramBot()
@@ -214,6 +237,8 @@ if __name__ == "__main__":
     os.environ['PYTHONUNBUFFERED'] = '1'
     
     print(f"[INIT] Starting MegaCyberBot application...", flush=True)
+    print(f"[INIT] Python version: {sys.version}", flush=True)
+    print(f"[INIT] Environment: {os.environ.get('ENVIRONMENT', 'development')}", flush=True)
     print(f"[INIT] Keep-alive strategy: Multiple endpoints, self-ping, heartbeat every 30s", flush=True)
     print(f"[INIT] External monitoring should ping every 5 minutes to various endpoints", flush=True)
     
