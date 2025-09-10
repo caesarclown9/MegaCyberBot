@@ -46,6 +46,17 @@ test_url = re.sub(r'\s+', '', test_url)
 print(f"Cleaned URL first 50 chars: {test_url[:50]}")
 print(f"Cleaned URL starts with 'postgresql': {test_url.startswith('postgresql')}")
 
+# Parse URL to check for password
+from urllib.parse import urlparse
+try:
+    parsed = urlparse(test_url)
+    if parsed.password:
+        print(f"  ✓ Password present ({len(parsed.password)} chars)")
+    else:
+        print("  ⚠️ WARNING: No password found in URL!")
+except Exception as e:
+    print(f"  ⚠️ Could not parse URL: {e}")
+
 print("\n=== Quick Import Test ===")
 try:
     from src.config import settings

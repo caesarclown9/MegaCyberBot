@@ -7,6 +7,29 @@ import os
 import socket
 import sys
 
+# Debug DATABASE_URL before any processing
+db_url = os.getenv("DATABASE_URL", "")
+if db_url:
+    # Check for password presence without revealing it
+    import re
+    from urllib.parse import urlparse
+    
+    # Clean URL for parsing
+    clean_url = db_url
+    if clean_url.startswith("DATABASE_URL="):
+        clean_url = clean_url.replace("DATABASE_URL=", "", 1)
+    clean_url = clean_url.strip()
+    clean_url = re.sub(r'\s+', '', clean_url)
+    
+    try:
+        parsed = urlparse(clean_url)
+        if parsed.password:
+            print(f"[INIT] DATABASE_URL validated: user={parsed.username}, password=*****, host={parsed.hostname}, port={parsed.port}", flush=True)
+        else:
+            print(f"[INIT] WARNING: DATABASE_URL missing password! user={parsed.username}, host={parsed.hostname}", flush=True)
+    except Exception as e:
+        print(f"[INIT] WARNING: Could not parse DATABASE_URL: {e}", flush=True)
+
 # Force IPv4 for all connections if FORCE_IPV4 is set
 if os.getenv("FORCE_IPV4", "").lower() in ["true", "1", "yes"]:
     print("[INIT] Forcing IPv4 connections for all network operations", flush=True)

@@ -124,6 +124,13 @@ Check logs in Coolify's log viewer. Look for:
    ```
    
    ⚠️ **DO NOT use direct connection (port 5432) - it causes IPv6 issues on Coolify!**
+   
+   **"Tenant or user not found" Error:**
+   If you see this error, check:
+   - Username format must be `postgres.[project-ref]` (get from Supabase dashboard)
+   - Password is correct and doesn't contain special characters that need escaping
+   - You're using the pooler endpoint (port 6543), not direct connection
+   - No spaces in the DATABASE_URL value
 
 2. **IPv6 Connection Issues** (if still occurring):
    - If you see `OSError: [Errno 101] Connect call failed` with IPv6 address like `2a05:d016:...`

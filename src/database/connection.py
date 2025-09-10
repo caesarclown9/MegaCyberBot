@@ -36,16 +36,27 @@ class DatabaseManager(LoggerMixin):
                 engine_kwargs["pool_recycle"] = 300
                 engine_kwargs["pool_size"] = 5
                 engine_kwargs["max_overflow"] = 10
-                # Force IPv4 and add connection parameters for Supabase
-                engine_kwargs["connect_args"] = {
+                # Connection parameters for Supabase pooler
+                connect_args = {
                     "server_settings": {
                         "application_name": "MegaCyberBot"
                     },
                     "command_timeout": 60,
                     "timeout": 30,
-                    # Disable SSL if not needed (Supabase usually requires it)
-                    "ssl": "prefer"
                 }
+                
+                # Supabase pooler requires SSL
+                if "pooler.supabase.com" in self.database_url:
+                    # Supabase pooler needs SSL but without cert verification
+                    import ssl
+                    ssl_context = ssl.create_default_context()
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+                    connect_args["ssl"] = ssl_context
+                else:
+                    connect_args["ssl"] = "prefer"
+                
+                engine_kwargs["connect_args"] = connect_args
             
             self._engine = create_async_engine(self.database_url, **engine_kwargs)
             
