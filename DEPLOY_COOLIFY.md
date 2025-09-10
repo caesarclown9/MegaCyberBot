@@ -19,7 +19,11 @@ TELEGRAM_GROUP_ID=-1234567890  # Your general news group ID
 TELEGRAM_VULNERABILITIES_GROUP_ID=-1234567891  # Your vulnerabilities group ID
 
 # Database (Supabase)
-DATABASE_URL=postgresql+asyncpg://postgres.xxxxxxxxxxxx:password@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
+# IMPORTANT: Use the pooler endpoint (port 6543) for better stability
+DATABASE_URL=postgresql+asyncpg://postgres.[PROJECT_ID]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+
+# Force IPv4 connections (set to true if having IPv6 connection issues)
+FORCE_IPV4=true
 
 # Environment
 ENVIRONMENT=production
@@ -106,16 +110,33 @@ Check logs in Coolify's log viewer. Look for:
 
 ### Database Connection Issues
 
-1. Check DATABASE_URL format:
+1. **Use Pooler Endpoint** (Recommended):
    ```
-   postgresql+asyncpg://user:password@host:port/database
+   # Pooler endpoint (port 6543) - more stable
+   postgresql+asyncpg://postgres.[PROJECT_ID]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+   ```
+   
+2. **Alternative Direct Connection** (if pooler doesn't work):
+   ```
+   # Direct connection (port 5432)
+   postgresql+asyncpg://postgres:[PASSWORD]@db.[PROJECT_ID].supabase.co:5432/postgres
    ```
 
-2. Ensure Supabase allows connections from Coolify's IP
+3. **IPv6 Connection Issues**:
+   - If you see `OSError: [Errno 101] Connect call failed` with IPv6 address
+   - Add environment variable: `FORCE_IPV4=true`
 
-3. Check logs for connection errors:
+4. **Check Supabase Settings**:
+   - Go to Supabase Dashboard → Settings → Database
+   - Ensure "Allow connections from all IPs" is enabled (or add Coolify's IP)
+   - Use connection string from "Connection pooling" section
+
+5. **Common Error Messages**:
    ```
    [STARTUP] Database connection attempt X/3 failed
+   OSError: [Errno 101] Connect call failed  # IPv6 issue
+   password authentication failed  # Wrong password
+   timeout  # Network or firewall issue
    ```
 
 ### Bot Not Starting
