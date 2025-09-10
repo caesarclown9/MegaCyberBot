@@ -110,21 +110,24 @@ Check logs in Coolify's log viewer. Look for:
 
 ### Database Connection Issues
 
-1. **Use Pooler Endpoint** (Recommended):
+1. **IMPORTANT - Use Pooler Endpoint** (REQUIRED for Coolify):
    ```
-   # Pooler endpoint (port 6543) - more stable
-   postgresql+asyncpg://postgres.[PROJECT_ID]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+   # Pooler endpoint (port 6543) - REQUIRED for stability
+   DATABASE_URL=postgresql+asyncpg://postgres.[PROJECT_ID]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
    ```
    
-2. **Alternative Direct Connection** (if pooler doesn't work):
-   ```
-   # Direct connection (port 5432)
-   postgresql+asyncpg://postgres:[PASSWORD]@db.[PROJECT_ID].supabase.co:5432/postgres
-   ```
+   ⚠️ **DO NOT use direct connection (port 5432) - it causes IPv6 issues on Coolify!**
 
-3. **IPv6 Connection Issues**:
-   - If you see `OSError: [Errno 101] Connect call failed` with IPv6 address
+2. **IPv6 Connection Issues** (if still occurring):
+   - If you see `OSError: [Errno 101] Connect call failed` with IPv6 address like `2a05:d016:...`
    - Add environment variable: `FORCE_IPV4=true`
+   - The bot will automatically force IPv4 connections
+
+3. **Get Correct Connection String from Supabase**:
+   - Go to Supabase Dashboard → Settings → Database
+   - Click on "Connection pooling" tab (NOT "Connection string")
+   - Copy the "Connection string" from pooler section
+   - Replace `postgresql://` with `postgresql+asyncpg://`
 
 4. **Check Supabase Settings**:
    - Go to Supabase Dashboard → Settings → Database

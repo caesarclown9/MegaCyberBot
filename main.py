@@ -239,6 +239,7 @@ if __name__ == "__main__":
     print(f"[INIT] Starting MegaCyberBot application...", flush=True)
     print(f"[INIT] Python version: {sys.version}", flush=True)
     print(f"[INIT] Environment: {os.environ.get('ENVIRONMENT', 'development')}", flush=True)
+    print(f"[INIT] Database URL type: {'pooler' if 'pooler.supabase.com' in os.environ.get('DATABASE_URL', '') else 'direct'}", flush=True)
     print(f"[INIT] Keep-alive strategy: Multiple endpoints, self-ping, heartbeat every 30s", flush=True)
     print(f"[INIT] External monitoring should ping every 5 minutes to various endpoints", flush=True)
     
