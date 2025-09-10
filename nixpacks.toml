@@ -1,0 +1,16 @@
+# Nixpacks configuration for Python application
+
+[phases.setup]
+nixPkgs = ["python3", "gcc"]
+nixLibs = ["zlib", "stdenv.cc.cc.lib"]
+aptPkgs = ["curl", "wget"]
+
+[phases.install]
+dependsOn = ["setup"]
+cmds = ["python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt"]
+cacheDirectories = ["/root/.cache/pip"]
+paths = ["/opt/venv/bin"]
+
+[start]
+# Use start.py which handles IPv4 forcing before imports
+cmd = "python start.py"

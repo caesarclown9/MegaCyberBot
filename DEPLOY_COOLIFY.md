@@ -108,6 +108,13 @@ Check logs in Coolify's log viewer. Look for:
 
 ## Troubleshooting
 
+### ⚠️ IMPORTANT: Setting DATABASE_URL in Coolify
+
+**Common Issue**: Make sure to set DATABASE_URL correctly in Coolify:
+- ✅ CORRECT: Just paste the URL value: `postgresql+asyncpg://postgres...`
+- ❌ WRONG: Including the variable name: `DATABASE_URL=postgresql+asyncpg://postgres...`
+- ❌ WRONG: Extra spaces in URL
+
 ### Database Connection Issues
 
 1. **IMPORTANT - Use Pooler Endpoint** (REQUIRED for Coolify):

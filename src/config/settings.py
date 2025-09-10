@@ -73,6 +73,17 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
+        # Clean up the URL if it contains the variable name prefix
+        if v.startswith("DATABASE_URL="):
+            v = v.replace("DATABASE_URL=", "", 1)
+        
+        # Strip any whitespace
+        v = v.strip()
+        
+        # Remove any extra spaces in the URL (common copy-paste error)
+        import re
+        v = re.sub(r'\s+', '', v)
+        
         # Support both sync and async PostgreSQL drivers
         if v.startswith("postgresql://"):
             # Convert to async driver for SQLAlchemy async
@@ -80,7 +91,10 @@ class Settings(BaseSettings):
         
         # Validate supported database types
         if not v.startswith(("sqlite", "postgresql+asyncpg", "postgresql+psycopg", "mysql")):
-            raise ValueError("Unsupported database type")
+            # Try to provide helpful error message
+            if "postgres" in v.lower():
+                raise ValueError(f"Database URL should start with 'postgresql+asyncpg://' not '{v[:30]}...'")
+            raise ValueError(f"Unsupported database type. URL starts with: '{v[:50]}...'")
         return v
     
     @field_validator("min_article_date")
